@@ -2,17 +2,15 @@
   "name": "chatter",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "npm@11.11.0", 
-  "workspaces": [
-    "app",
-    "server"
-  ],
+  "packageManager": "pnpm@10.0.0",
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint"
   },
   "devDependencies": {
-    "turbo": "^2.9.18"
+    "@types/node": "^26.0.0",
+    "turbo": "^2.9.18",
+    "typescript": "^6.0.3"
   }
 }
