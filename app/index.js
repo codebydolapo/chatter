@@ -14,6 +14,7 @@ function sendMessage(e) {
 
 document.querySelector("form").addEventListener("submit", sendMessage);
 
+//Listen for messages
 socket.addEventListener("message", ({ data }) => {
   // If data is a Blob (binary), read it as text
   if (data instanceof Blob) {
@@ -23,6 +24,7 @@ socket.addEventListener("message", ({ data }) => {
   }
 });
 
+//append whatever was sent to the frontend's ul
 function appendMessage(text) {
   const li = document.createElement("li");
   li.textContent = text;
