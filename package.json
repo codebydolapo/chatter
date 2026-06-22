@@ -1,0 +1,17 @@
+{
+  "name": "chatter",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "app",
+    "server"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.9.18"
+  }
+}
