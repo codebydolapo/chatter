@@ -2,38 +2,57 @@
 
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 
-const SocketContext = createContext(null);
+interface MessagePacket {
+  type: 'MESSAGE' | 'PRIVATE_MESSAGE' | 'SYSTEM_ERROR';
+  from: string;
+  to?: string;
+  payload: string;
+}
 
-export const useSocket = () => useContext(SocketContext);
+interface SocketContextProps {
+  messages: MessagePacket[];
+  myId: string | null;
+  isConnected: boolean;
+  sendBroadcast: (text: string) => void;
+  sendPrivateMessage: (targetId: string, text: string) => void;
+}
 
-export const SocketProvider = ({ children }) => {
-  const [messages, setMessages] = useState([]);
+const SocketContext = createContext<SocketContextProps | null>(null);
+
+export const useSocket = () => {
+  const context = useContext(SocketContext);
+  if (!context) throw new Error("useSocket must be used within a SocketProvider");
+  return context;
+};
+
+export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [messages, setMessages] = useState<MessagePacket[]>([]);
+  const [myId, setMyId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef(null);
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    // 1. Establish connection to backend port
-    const ws = new WebSocket('ws://localhost:4000');
+    const ws = new WebSocket('ws://localhost:8080');
     socketRef.current = ws;
 
-    ws.onopen = () => {
-      setIsConnected(true);
-      console.log('Connected to WebSocket server');
-    };
-
+    ws.onopen = () => setIsConnected(true);
+    
     ws.onmessage = async ({ data }) => {
-      // Safely handle text strings or blobs sent by our server
       const text = data instanceof Blob ? await data.text() : data;
-      setMessages((prev) => [...prev, text]);
+      const packet = JSON.parse(text);
+
+      if (packet.type === "SYSTEM_WELCOME") {
+        setMyId(packet.payload.userId);
+      } else {
+        setMessages((prev) => [...prev, packet]);
+      }
     };
 
     ws.onclose = () => {
       setIsConnected(false);
-      console.log('Disconnected from WebSocket server');
+      setMyId(null);
     };
 
-    // 2. Strict Mode & Unmount Cleanup Loop
-    // This function runs when the component unmounts, cleaning up the socket connection completely.
     return () => {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close();
@@ -41,14 +60,20 @@ export const SocketProvider = ({ children }) => {
     };
   }, []);
 
-  const sendMessage = (message) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(message);
+  const sendBroadcast = (text: string) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'BROADCAST', payload: text }));
+    }
+  };
+
+  const sendPrivateMessage = (targetId: string, text: string) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'PRIVATE_MESSAGE', targetId, payload: text }));
     }
   };
 
   return (
-    <SocketContext.Provider value={{ messages, isConnected, sendMessage }}>
+    <SocketContext.Provider value={{ messages, myId, isConnected, sendBroadcast, sendPrivateMessage }}>
       {children}
     </SocketContext.Provider>
   );

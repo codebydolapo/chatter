@@ -1,68 +1,88 @@
-import ws, { WebSocket, WebSocketServer } from "ws";
-import path from "path";
-import dotenv from "dotenv";
-import { fileURLToPath } from "url";
+import { WebSocketServer, WebSocket } from "ws";
+import { v4 as uuidv4 } from "uuid"; 
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-
-const port = process.env.WEBSOCKET_PORT ? parseInt(process.env.WEBSOCKET_PORT, 10) : 8080;
-
+const port = process.env.WEBSOCKET_PORT ? parseInt(process.env.WEBSOCKET_PORT) : 8080;
 const server = new WebSocketServer({ port });
 
-// Extend the native WebSocket type to include our custom tracking property
+// Custom interface to attach metadata directly to the socket instance
 interface ExtWebSocket extends WebSocket {
+  id: string;
   isAlive: boolean;
 }
 
-// Helper to keep track of alive connections
-function heartbeat(this: ExtWebSocket) {
-  this.isAlive = true;
-}
+// Global registry of active connections: Mapping userId -> Socket
+const clients = new Map<string, ExtWebSocket>();
 
 server.on("connection", (socket: ExtWebSocket) => {
+  // 1. Assign a unique ID to this session
+  socket.id = uuidv4();
   socket.isAlive = true;
-  
-  // Respond to pongs from the client
-  socket.on("pong", heartbeat);
+  clients.set(socket.id, socket);
 
-  socket.on("message", (message: ws.RawData, isBinary: boolean) => {
+  // Send an initial system event telling the user what their ID is
+  socket.send(JSON.stringify({
+    type: "SYSTEM_WELCOME",
+    payload: { userId: socket.id }
+  }));
+
+  console.log(`User connected: ${socket.id}. Total active: ${clients.size}`);
+
+  socket.on("pong", () => { socket.isAlive = true; });
+
+  socket.on("message", (rawMessage, isBinary) => {
     try {
-      // Handle data safely depending on whether it's binary or text
-      const messageString = isBinary ? message : message.toString();
-      console.log("Received:", messageString);
+      const dataString = isBinary ? rawMessage : rawMessage.toString();
+      const packet = JSON.parse(dataString);
 
-      // Broadcast to EVERYONE connected to the server:
-      server.clients.forEach((client) => {
-        if (client.readyState === ws.OPEN) {
-          client.send(message, { binary: isBinary });
-        }
-      });
+      const { type, targetId, payload } = packet;
+
+      switch (type) {
+        case "BROADCAST":
+          // Global chat
+          clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({ type: "MESSAGE", from: socket.id, payload }));
+            }
+          });
+          break;
+
+        case "PRIVATE_MESSAGE":
+          // One-on-one targeted routing
+          const targetSocket = clients.get(targetId);
+          if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
+            targetSocket.send(JSON.stringify({ type: "PRIVATE_MESSAGE", from: socket.id, payload }));
+            // Echo back to sender for their UI history
+            socket.send(JSON.stringify({ type: "PRIVATE_MESSAGE", from: socket.id, to: targetId, payload }));
+          } else {
+            socket.send(JSON.stringify({ type: "SYSTEM_ERROR", payload: "User offline or not found." }));
+          }
+          break;
+
+        default:
+          console.warn(`Unknown packet type received: ${type}`);
+      }
     } catch (err) {
-      console.error("Error processing message:", err);
+      console.error("Failed to parse incoming packet", err);
     }
   });
 
   socket.on("close", () => {
-    console.log("Client disconnected");
+    clients.delete(socket.id);
+    console.log(`User disconnected: ${socket.id}. Remaining: ${clients.size}`);
   });
 });
 
-// Terminate dead sockets every 30 seconds
+// Heartbeat Pruning
 const interval = setInterval(() => {
-  server.clients.forEach((client) => {
-    const socket = client as ExtWebSocket;
-    if (socket.isAlive === false) return socket.terminate();
-
+  clients.forEach((socket, id) => {
+    if (!socket.isAlive) {
+      clients.delete(id);
+      return socket.terminate();
+    }
     socket.isAlive = false;
     socket.ping();
   });
 }, 30000);
 
-server.on("close", () => {
-  clearInterval(interval);
-});
-
-console.log(`WebSocket server running on port ${port}`);
+server.on("close", () => clearInterval(interval));
+console.log(`WebSocket Server orchestrated on port ${port}`);

@@ -4,6 +4,22 @@
 This repository demonstrates a small-scale WebSocket chat system and how to evolve it toward a horizontally-scaled architecture. It contains a Next.js frontend (`app`) and a minimal WebSocket server (`server`). The project is organized as a monorepo using Turborepo and pnpm workspaces.
 
 ---
+- [x] **Iteration 0: The Core Proof of Concept**
+  - Simple local Node.js `ws` server echoing messages back to a basic HTML/JS client.
+  
+- [x] **Iteration 1: Robust Single-Instance**
+  - Patched form submission state bugs on the client.
+  - Implemented heartbeat mechanisms (`ping`/`pong`) to prune dead connections and conserve server memory.
+  - Added binary/text runtime data handling safety blocks to avoid server crashes.
+
+- [x] **Iteration 2: Migration to Modern Frontend Framework**
+  - Migrated the vanilla client into a clean Next.js application ecosystem.
+  - Built a scalable `SocketContext` layer using a `useRef` architecture to keep a unified state across client views.
+  - Configured robust cleanup logic inside functional lifecycles to handle React Strict Mode duplicate connection mounts gracefully.
+
+- [x] **Iteration 3: Targeted Routing & Identity**
+  - Upgraded raw stream strings to structured JSON frame packets (`BROADCAST`, `PRIVATE_MESSAGE`).
+  - Added connection identity maps to uniquely target client frames by session identifier IDs.
 
 What this repo contains
 - `app/` — Next.js frontend (React + `SocketContext` for client-side WebSocket usage).
