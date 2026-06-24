@@ -1,5 +1,5 @@
 # Scalable WebSocket Journey (Chatter Monorepo)
-# Iteration 2: Moving from vanilla to Next.js
+# Iteration 2: Moving from vanilla to Next.js and implementing monorepo setup
 
 This repository demonstrates a small-scale WebSocket chat system and how to evolve it toward a horizontally-scaled architecture. It contains a Next.js frontend (`app`) and a minimal WebSocket server (`server`). The project is organized as a monorepo using Turborepo and pnpm workspaces.
 
