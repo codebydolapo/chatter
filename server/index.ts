@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 const port = process.env.WEBSOCKET_PORT ? parseInt(process.env.WEBSOCKET_PORT) : 8080;
 const server = new WebSocketServer({ port });
 
+console.log(port)
+
 // Custom interface to attach metadata directly to the socket instance
 interface ExtWebSocket extends WebSocket {
   id: string;

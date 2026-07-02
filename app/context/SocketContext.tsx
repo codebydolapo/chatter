@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { useAuth } from './AuthContext';
 
 interface MessagePacket {
   type: 'MESSAGE' | 'PRIVATE_MESSAGE' | 'SYSTEM_ERROR';
@@ -30,12 +31,26 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [myId, setMyId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
+  const { user } = useAuth();
+
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8080');
+// If no user is authenticated, guarantee any leftover socket is killed
+    if (!user) {
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+      setIsConnected(false);
+      return;
+    }
+
+    const wsUrl = `ws://localhost:8080?userId=${user.uid}`;
+   const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
     ws.onopen = () => setIsConnected(true);
+    ws.onclose = () => setIsConnected(false);
     
     ws.onmessage = async ({ data }) => {
       const text = data instanceof Blob ? await data.text() : data;
